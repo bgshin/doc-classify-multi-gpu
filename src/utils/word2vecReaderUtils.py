@@ -36,7 +36,7 @@ import traceback
 from contextlib import contextmanager
 
 import numpy
-import scipy.sparse
+# import scipy.sparse
 
 if sys.version_info[0] >= 3:
     unicode = str

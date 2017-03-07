@@ -198,7 +198,7 @@ def build_w2v_data(dataset, w2vmodel, padlen):
     return [x, y]
 
 
-def build_input_data_with_w2v(sentences, labels, w2vmodel, lexiconModel):
+def build_input_data_with_w2v(sentences, labels, w2vmodel):
     """
     Maps sentencs and labels to vectors based on a vocabulary.
     """
@@ -210,24 +210,25 @@ def build_input_data_with_w2v(sentences, labels, w2vmodel, lexiconModel):
         except:
             return np.array([np.float32(0.0)]*w2v_dim)
 
-    def get_index_of_vocab_lex(lexiconModel, word):
-        lexiconList = np.empty([0, 1])
-        for index, eachModel in enumerate(lexiconModel):
-            if word in eachModel:
-                temp = np.array(np.float32(eachModel[word]))
-            else:
-                temp = np.array(np.float32(eachModel["<PAD/>"]))
-            lexiconList = np.append(lexiconList, temp)
-
-        if len(lexiconList) > 15:
-            print len(lexiconList)
-            print '======================over 15======================'
-        return lexiconList
-
     x = np.array([[get_index_of_voca(w2vmodel,word) for word in sentence] for sentence in sentences])
-    x_lex = np.array([[get_index_of_vocab_lex(lexiconModel, word) for word in sentence] for sentence in sentences])
     y = np.array(labels)
-    return [x, y, x_lex]
+    return [x, y]
+
+
+def load_data_new(dataset, w2vmodel, padlen):
+    """
+    Loads and preprocessed data for the MR dataset.
+    Returns input vectors, labels, vocabulary, and inverse vocabulary.
+    """
+    # Load and preprocess data
+    sentences, labels = load_data_and_labels(dataset)
+    sentences_padded = pad_sentences(sentences, padlen)
+
+    x, y = build_input_data_with_w2v(sentences_padded, labels, w2vmodel)
+
+    return [x, y]
+
+
 
 def load_data(dataset, w2vmodel, lexiconModel, padlen=None, rottenTomato=False, multichannel=False):
 # def load_data(dataset, w2vmodel, padlen=None):

@@ -27,6 +27,7 @@ tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after 
 # Misc Parameters
 tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
 tf.flags.DEFINE_boolean("log_device_placement", True, "Log placement of ops on devices")
+tf.flags.DEFINE_boolean("num_gpus", 4, "num of GPUs")
 
 FLAGS = tf.flags.FLAGS
 FLAGS._parse_flags()
@@ -52,10 +53,7 @@ def load_w2v(w2vdim, simple_run=True, source="twitter"):
         return model
 
 
-
-
-
-def run_train(w2vsource, w2vdim, w2vnumfilters, randomseed, num_epochs, l2_reg_lambda):
+def run_train(w2vsource, w2vdim, w2vnumfilters, randomseed, num_epochs, l2_reg_lambda, l1_reg_lambda):
     max_len = 60
     num_classes = 3
 
@@ -97,7 +95,8 @@ def run_train(w2vsource, w2vdim, w2vnumfilters, randomseed, num_epochs, l2_reg_l
                 embedding_size=w2vdim,
                 filter_sizes=list(map(int, FLAGS.filter_sizes.split(","))),
                 num_filters=w2vnumfilters,
-                l2_reg_lambda=l2_reg_lambda)
+                l2_reg_lambda=l2_reg_lambda,
+                l1_reg_lambda=l1_reg_lambda)
 
 
             # Define Training procedure
@@ -275,4 +274,4 @@ if __name__ == "__main__":
 
     with Timer('trn..'):
         run_train(args.w2vsource, args.w2vdim, args.w2vnumfilters, args.randomseed, args.num_epochs,
-                  args.l2_reg_lambda)
+                  args.l2_reg_lambda, args.l1_reg_lambda)
