@@ -33,7 +33,7 @@ def load_batch(data_provider, batch_size=32, height=299, width=299, is_training=
     """
 
     image_raw, label = data_provider.get(['image', 'label'])
-    print image_raw.shaep, label.shape
+    print image_raw.shape, label.shape
 
     # Preprocess image for usage by Inception.
     image = inception_preprocessing.preprocess_image(image_raw, height, width, is_training=is_training, fast_mode=True)
