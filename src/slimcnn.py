@@ -15,9 +15,15 @@ def slimcnn(txts, num_classes, sequence_length, embedding_size, filter_sizes, nu
 
     with tf.variable_scope(scope, 'SlimCNN', [txts, num_classes]):
         pooled_outputs = []
+        txts = tf.expand_dims(txts, -1)
         for filter_size in filter_sizes:
-            net = slim.conv2d(txts, num_filters, [filter_size, embedding_size], scope='conv_%d' % filter_size)
-            net = slim.max_pool2d(net, [1, sequence_length - filter_size + 1], stride=1, scope='pool_%d' % filter_size)
+            net = slim.conv2d(txts, num_filters, [filter_size, embedding_size], padding='VALID', stride=1,
+                              scope='conv_%d' % filter_size)
+            # net = slim.conv2d(txts, num_filters, [filter_size, embedding_size],  stride=1, scope='conv_%d' % filter_size)
+            # net = slim.conv2d(txts, num_filters, [filter_size], stride=1, scope='conv_%d' % filter_size)
+            # net = layers.conv2d(inputs, 64, [7, 7], stride=2, scope=end_point)
+            print scope, net
+            net = slim.max_pool2d(net, [sequence_length - filter_size + 1, 1], stride=1, scope='pool_%d' % filter_size)
             pooled_outputs.append(net)
 
         print 'pooled_outputs', pooled_outputs
@@ -27,8 +33,7 @@ def slimcnn(txts, num_classes, sequence_length, embedding_size, filter_sizes, nu
         h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
 
         h_drop = slim.dropout(h_pool_flat, dropout_keep_prob)
-        logits = slim.fully_connected(h_drop, num_classes, activation_fn=None,
-                                      scope='fc')
+        logits = slim.fully_connected(h_drop, num_classes, activation_fn=None, scope='fc')
 
     end_points['Logits'] = logits
     end_points['Predictions'] = slim.softmax(logits, scope='Predictions')

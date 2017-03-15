@@ -1,21 +1,28 @@
-
+from preprocessing import inception_preprocessing
 import tensorflow as tf
+from tensorflow.python.ops import math_ops
 import os
 
 from datasets import flowers
+# from nets import inception
 from tensorflow.contrib.slim.nets import inception
 from preprocessing import inception_preprocessing
 import time
 import numpy as np
 from datetime import datetime
 
+checkpoints_dir = '/tmp/checkpoints'
+train_dir = '/tmp/inception_finetuned/'
+flowers_data_dir = '/tmp/flowers'
 slim = tf.contrib.slim
+image_size = inception.inception_v1.default_image_size
+
 BATCH_SIZE = 158  # How many images can pass through *a single GPU*
 # (if they are different specs you'll have to adapt the script)
 MAX_STEPS = 1000000
 NUM_GPUS = 2
 
-flowers_data_dir = '/tmp/flowers'
+
 def load_batch(data_provider, batch_size=32, height=299, width=299, is_training=False):
     """Loads a single batch of data.
 
@@ -33,8 +40,6 @@ def load_batch(data_provider, batch_size=32, height=299, width=299, is_training=
     """
 
     image_raw, label = data_provider.get(['image', 'label'])
-    print 'image_raw.shape', image_raw.shape
-    print 'label.shape', label.shape
 
     # Preprocess image for usage by Inception.
     image = inception_preprocessing.preprocess_image(image_raw, height, width, is_training=is_training, fast_mode=True)
@@ -53,7 +58,8 @@ def load_batch(data_provider, batch_size=32, height=299, width=299, is_training=
 
     return images, images_raw, labels
 
-from tensorflow.python.ops import math_ops
+
+
 
 def get_total_loss(scope, name="total_loss"):
     losses = slim.losses.get_losses(scope=scope)
@@ -81,11 +87,11 @@ def tower_loss(scope, data_provider):
     one_hot_labels = slim.one_hot_encoding(labels, dataset.num_classes, scope=scope)
 
     slim.losses.softmax_cross_entropy(logits, one_hot_labels, scope=scope)
+    # tf.losses.softmax_cross_entropy(logits, one_hot_labels, scope=scope)
 
     total_loss = get_total_loss(scope)
 
     return total_loss
-
 
 def average_gradients(tower_grads):
     """Calculate the average gradient for each shared variable across all towers.
@@ -124,10 +130,6 @@ def average_gradients(tower_grads):
         average_grads.append(grad_and_var)
     return average_grads
 
-from tensorflow.contrib.slim.nets import inception
-image_size = inception.inception_v1.default_image_size
-
-checkpoints_dir = '/tmp/checkpoints'
 
 def get_init_fn():
     """Returns a function run by the chief worker to warm-start the training."""
@@ -150,8 +152,6 @@ def get_init_fn():
         variables_to_restore)
 
 
-train_dir = '/tmp/inception_finetuned/'
-
 with tf.Graph().as_default():
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -159,6 +159,7 @@ with tf.Graph().as_default():
                                   trainable=False)
 
     # Specify the optimizer and create the train op:
+    # optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.001)
     optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
 
     # Here you can substitute the flowers dataset for your own dataset.
@@ -188,10 +189,10 @@ with tf.Graph().as_default():
 
     train_op = apply_gradient_op
 
-    saver = tf.train.Saver(tf.all_variables())
+    saver = tf.train.Saver(tf.global_variables())
 
     # Build an initialization operation to run below.
-    init = tf.initialize_all_variables()
+    init = tf.global_variables_initializer()
 
     # Start running operations on the Graph.
     sess = tf.Session(config=tf.ConfigProto(
@@ -205,6 +206,7 @@ with tf.Graph().as_default():
     # Start the queue runners.
     tf.train.start_queue_runners(sess=sess)
 
+    # summary_writer = tf.train.SummaryWriter(train_dir, sess.graph)
     summary_writer = tf.summary.FileWriter(train_dir, sess.graph)
 
     for step in range(MAX_STEPS):
@@ -231,5 +233,3 @@ with tf.Graph().as_default():
         if step % 1000 == 0 or (step + 1) == MAX_STEPS:
             checkpoint_path = os.path.join(train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
-
-# print('Finished training. Last batch loss %f' % final_loss)

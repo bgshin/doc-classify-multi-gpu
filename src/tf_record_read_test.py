@@ -2,7 +2,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import math_ops
 from slimcnn import slimcnn
-import time, datetime, os
+import time, os
+from datetime import datetime
 slim = tf.contrib.slim
 
 # datasets = []
@@ -64,8 +65,7 @@ slim = tf.contrib.slim
 
 
 
-
-def load_batch(data_provider, batch_size=4):
+def load_batch(data_provider, seqlen=60, w2vdim=400, nclass=3, batch_size=4):
     features = tf.parse_single_example(
         data_provider,
         features={
@@ -73,10 +73,14 @@ def load_batch(data_provider, batch_size=4):
             'label': tf.FixedLenFeature([], tf.string)
         })
 
-    txt = features['txt']
-    label = features['label']
+    txt = tf.decode_raw(features['txt'], tf.float32)
+    label = tf.decode_raw(features['label'], tf.uint8)
 
-    txts, labels = tf.train.shuffle_batch([txt, label],
+    resized_x = tf.reshape(txt, [seqlen, w2vdim])
+    resized_label = tf.reshape(label, [nclass])
+
+
+    txts, labels = tf.train.shuffle_batch([resized_x, resized_label],
                                           batch_size=batch_size,
                                           capacity=30,
                                           num_threads=2,
@@ -128,7 +132,7 @@ def average_gradients(tower_grads):
             grads.append(expanded_g)
 
         # Average over the 'tower' dimension.
-        grad = tf.concat(0, grads)
+        grad = tf.concat(grads, 0)
         grad = tf.reduce_mean(grad, 0)
 
         # Keep in mind that the Variables are redundant because they are shared
@@ -148,8 +152,8 @@ def tower_loss(scope, data_provider):
     w2v_dim = 400
     logits, _ = slimcnn(txts, num_class, seq_len, w2v_dim, [2,3,4,5], 32,
                         is_training=True)
-    one_hot_labels = slim.one_hot_encoding(labels, num_class, scope=scope)
-    slim.losses.softmax_cross_entropy(logits, one_hot_labels, scope=scope)
+    # one_hot_labels = slim.one_hot_encoding(labels, num_class, scope=scope)
+    slim.losses.softmax_cross_entropy(logits, labels, scope=scope)
     total_loss = get_total_loss(scope)
 
     return total_loss
@@ -158,6 +162,13 @@ MAX_STEPS = 1500
 NUM_GPUS = 1
 train_dir = '/tmp/bgshin/slim_test/'
 
+tfrecords_filename = '/tmp/bgshin/tw.trn.tfrecords'
+filename_queue = tf.train.string_input_producer(
+    [tfrecords_filename], num_epochs=10)
+
+reader = tf.TFRecordReader()
+_, data_provider = reader.read(filename_queue)
+
 with tf.Graph().as_default():
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -165,16 +176,19 @@ with tf.Graph().as_default():
                                   trainable=False)
 
     # Specify the optimizer and create the train op:
-    optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.001)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
 
+    # init_op = tf.group(tf.initialize_all_variables(), tf.initialize_local_variables())
+
+    # init_op = tf.global_variables_initializer()
+    # init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+    # sess = tf.Session(config=tf.ConfigProto(
+    #     allow_soft_placement=True,
+    #     log_device_placement=True))
+    # sess.run(init_op)
 
     # Here you can substitute the flowers dataset for your own dataset.
-    tfrecords_filename = '/tmp/bgshin/tw.trn.tfrecords'
-    filename_queue = tf.train.string_input_producer(
-        [tfrecords_filename], num_epochs=10)
 
-    reader = tf.TFRecordReader()
-    _, data_provider = reader.read(filename_queue)
 
 
     tower_grads = []
@@ -214,14 +228,15 @@ with tf.Graph().as_default():
     # Start the queue runners.
     tf.train.start_queue_runners(sess=sess)
 
-    summary_writer = tf.train.SummaryWriter(train_dir, sess.graph)
+    summary_writer = tf.summary.FileWriter(train_dir, sess.graph)
 
     for step in range(MAX_STEPS):
         start_time = time.time()
 
         # This code gets the average loss, and the losses on GPUs 1 and 2, to print.
         # If you have more GPUs then you will need to adapt it.
-        _, loss_value, losses_value_0, losses_value_1 = sess.run([train_op, loss, losses[0], losses[1]])
+        # _, loss_value, losses_value_0, losses_value_1 = sess.run([train_op, loss, losses[0], losses[1]])
+        _, loss_value = sess.run([train_op, loss])
         duration = time.time() - start_time
 
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
@@ -231,9 +246,13 @@ with tf.Graph().as_default():
             examples_per_sec = num_examples_per_step / duration
             sec_per_batch = float(duration) / NUM_GPUS
 
-            format_str = ('%s: step %d, loss = %.2f (0: %.2f, 1: %.2f) (%.1f examples/sec; %.3f '
+            # format_str = ('%s: step %d, loss = %.2f (0: %.2f, 1: %.2f) (%.1f examples/sec; %.3f '
+            #               'sec/batch)')
+            # print (format_str % (datetime.now(), step, loss_value, losses_value_0, losses_value_1,
+            #                      examples_per_sec, sec_per_batch))
+            format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
                           'sec/batch)')
-            print (format_str % (datetime.now(), step, loss_value, losses_value_0, losses_value_1,
+            print (format_str % (datetime.now(), step, loss_value,
                                  examples_per_sec, sec_per_batch))
 
         # Save the model checkpoint periodically.
