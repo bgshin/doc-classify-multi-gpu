@@ -23,46 +23,47 @@ import os
 
 import tensorflow as tf
 
-import cifar10_input
+import cnnt_input
+import numpy as np
 
 
-class CIFAR10InputTest(tf.test.TestCase):
+class CNNTInputTest(tf.test.TestCase):
 
-  def _record(self, label, red, green, blue):
-    image_size = 32 * 32
-    record = bytes(bytearray([label] + [red] * image_size +
-                             [green] * image_size + [blue] * image_size))
-    expected = [[[red, green, blue]] * 32] * 32
-    return record, expected
+  def _record(self, label, num):
+    input_size = 60 * 400
+    x = np.ones([60,400]) * num
+    x = x.reshape([input_size])
+    x = np.append(float(label), x)
+    # x = np.array([label] + [num] * input_size)
+    record = x.tostring()
+    expected = np.array([[[num]] * 400] * 60)
+    return record, expected[:,:,0]
 
   def testSimple(self):
-    labels = [9, 3, 0]
-    records = [self._record(labels[0], 0, 128, 255),
-               self._record(labels[1], 255, 0, 1),
-               self._record(labels[2], 254, 255, 0)]
+    labels = [1, 0, 2]
+    records = [self._record(labels[0], 0.1),
+               self._record(labels[1], 0.2),
+               self._record(labels[2], 0.3)]
     contents = b"".join([record for record, _ in records])
     expected = [expected for _, expected in records]
-    filename = os.path.join(self.get_temp_dir(), "cifar")
+    filename = os.path.join(self.get_temp_dir(), "cnnt")
     open(filename, "wb").write(contents)
 
     with self.test_session() as sess:
-      # q = tf.FIFOQueue(99, [tf.string], shapes=())
-      # q.enqueue([filename]).run()
-      # q.close().run()
       q = tf.train.string_input_producer([filename])
       q.enqueue([filename]).run()
       q.close().run()
-      result = cifar10_input.read_cifar10(q)
+      result = cnnt_input.read_cnnt(q)
 
       for i in range(3):
-        key, label, uint8image = sess.run([
-            result.key, result.label, result.uint8image])
+        key, label, features = sess.run([
+            result.key, result.label, result.features])
         self.assertEqual("%s:%d" % (filename, i), tf.compat.as_text(key))
         self.assertEqual(labels[i], label)
-        self.assertAllEqual(expected[i], uint8image)
+        self.assertAllEqual(expected[i], features)
 
       with self.assertRaises(tf.errors.OutOfRangeError):
-        sess.run([result.key, result.uint8image])
+        sess.run([result.key, result.features])
 
 
 if __name__ == "__main__":
