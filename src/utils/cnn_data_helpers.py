@@ -32,9 +32,9 @@ def load_data_and_labels(dataset, rottenTomato=False):
     Returns split sentences and labels.
     """
     if rottenTomato:
-        template_txt = '../data/rt-data-nlp4jtok/%s'
+        template_txt = '../../data/rt-data-nlp4jtok/%s'
     else:
-        template_txt = '../data/tweets/txt/%s'
+        template_txt = '../../data/tweets/txt/%s'
 
     pathtxt = template_txt % dataset
 
