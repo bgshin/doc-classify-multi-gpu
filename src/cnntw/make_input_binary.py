@@ -62,7 +62,8 @@ with Timer('w2v..'):
     w2vmodel = load_w2v(w2vdim)
 
 
-targets = ['dev', 'tst', 'trn']
+# targets = ['dev', 'tst', 'trn']
+targets = ['dev']
 
 for t in targets:
     with Timer('writing_%s..' % t):
