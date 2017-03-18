@@ -76,10 +76,10 @@ def _activation_summary(x):
 
 
 def inference(txts):
-    """Build the CIFAR-10 model.
+    """Build the cnn based sentiment prediction model.
 
     Args:
-    txts: Images returned from distorted_inputs() or inputs().
+    txts: text returned from get_inputs().
 
     Returns:
     Logits.
@@ -91,41 +91,75 @@ def inference(txts):
     #
     # conv1 [filter_size, embedding_size, 1, num_filters]
     sequence_length = 60
-    filter_size = 3
     embedding_size = 400
     num_filters = 64
-    cnn_shape = [filter_size, embedding_size, 1, num_filters]
-    with tf.variable_scope('conv1') as scope:
-        kernel = _variable_with_weight_decay('weights',
-                                                shape=cnn_shape,
-                                                stddev=5e-2,
-                                                wd=0.0)
-        conv = tf.nn.conv2d(txts, kernel, [1, 1, 1, 1], padding='VALID')
-        biases = _variable_on_cpu('biases', [64], tf.constant_initializer(0.0))
-        pre_activation = tf.nn.bias_add(conv, biases)
-        conv1 = tf.nn.relu(pre_activation, name=scope.name)
-        _activation_summary(conv1)
+    filter_sizes = [2, 3, 4, 5]
 
-    # pool1 [1, sequence_length - filter_size + 1, 1, 1],
 
-    ksize = [1, sequence_length - filter_size + 1, 1, 1]
-    pool1 = tf.nn.max_pool(conv1, ksize=ksize, strides=[1, 1, 1, 1],
-                         padding='VALID', name='pool1')
+    # with tf.variable_scope('conv1') as scope:
+    #     kernel = _variable_with_weight_decay('weights',
+    #                                             shape=cnn_shape,
+    #                                             stddev=5e-2,
+    #                                             wd=0.0)
+    #     conv = tf.nn.conv2d(txts, kernel, [1, 1, 1, 1], padding='VALID')
+    #     biases = _variable_on_cpu('biases', [64], tf.constant_initializer(0.1))
+    #     pre_activation = tf.nn.bias_add(conv, biases)
+    #     conv1 = tf.nn.relu(pre_activation, name=scope.name)
+    #     _activation_summary(conv1)
+
+
+    pooled_outputs = []
+    for i, filter_size in enumerate(filter_sizes):
+        with tf.variable_scope("conv-maxpool-%s" % filter_size) as scope:
+            cnn_shape = [filter_size, embedding_size, 1, num_filters]
+            kernel = _variable_with_weight_decay('weights',
+                                                 shape=cnn_shape,
+                                                 stddev=5e-2,
+                                                 wd=0.0)
+            conv = tf.nn.conv2d(txts, kernel, [1, 1, 1, 1], padding='VALID')
+            biases = _variable_on_cpu('biases', [num_filters], tf.constant_initializer(0.0))
+            pre_activation = tf.nn.bias_add(conv, biases)
+            conv_out = tf.nn.relu(pre_activation, name=scope.name)
+            _activation_summary(conv_out)
+
+
+            ksize = [1, sequence_length - filter_size + 1, 1, 1]
+            print 'filter_size', filter_size
+            print 'ksize', ksize
+            print 'conv_out', conv_out
+            pooled = tf.nn.max_pool(conv_out, ksize=ksize, strides=[1, 1, 1, 1],
+                                 padding='VALID', name='pool1')
+
+            pooled_outputs.append(pooled)
+
     # norm1
-    norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
-                    name='norm1')
+    # norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
+    #                 name='norm1')
 
-    print 'norm1', norm1
-    num_filters_total = num_filters * 1
-    norm_flat = tf.reshape(norm1, [-1, num_filters_total])
+    # norm1 = pool1
+
+
+
+    # print 'norm1', norm1
+    num_filters_total = num_filters * len(filter_sizes)
+    h_pool = tf.concat(pooled_outputs, 3)
+
+    h_pool = tf.concat(pooled_outputs, 3)
+    h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+    print 'h_pool', h_pool
+    print 'h_pool_flat', h_pool_flat
+
+
+    # num_filters_total = num_filters * 1
+    # norm_flat = tf.reshape(norm1, [-1, num_filters_total])
 
 
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay('weights', [64, NUM_CLASSES],
-                                              stddev=1/64.0, wd=0.0)
+        weights = _variable_with_weight_decay('weights', [num_filters_total, NUM_CLASSES],
+                                              stddev=1/float(num_filters_total), wd=0.0)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
-                                  tf.constant_initializer(0.0))
-        softmax_linear = tf.add(tf.matmul(norm_flat, weights), biases, name=scope.name)
+                                  tf.constant_initializer(0.1))
+        softmax_linear = tf.add(tf.matmul(h_pool_flat, weights), biases, name=scope.name)
         _activation_summary(softmax_linear)
 
     return softmax_linear
@@ -147,13 +181,17 @@ def loss(logits, labels):
     """
     # Calculate the average cross entropy loss across the batch.
     # labels = tf.cast(labels, tf.int64)
-    labels = tf.cast(tf.argmax(labels, 1), tf.int64)
-
-    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=labels, logits=logits, name='cross_entropy_per_example')
+    # labels = tf.cast(tf.argmax(labels, 1), tf.int64)
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels, name='cross_entropy_per_example')
+    # cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels, logits=logits, name='cross_entropy_per_example')
     cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
     tf.add_to_collection('losses', cross_entropy_mean)
 
+    golds = tf.argmax(labels, 1, name="golds")
+    predictions = tf.argmax(logits, 1, name="predictions")
+    correct_predictions = tf.equal(predictions, tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+
     # The total loss is defined as the cross entropy loss plus all of the weight
     # decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name='total_loss'), labels
+    return tf.add_n(tf.get_collection('losses'), name='total_loss'), labels, accuracy

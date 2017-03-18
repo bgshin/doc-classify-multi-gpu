@@ -21,7 +21,7 @@ tf.app.flags.DEFINE_string('train_dir', '/home/bgshin/works/doc-classify-multi-g
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 1000000,
                             """Number of batches to run.""")
-tf.app.flags.DEFINE_integer('num_gpus', 4,
+tf.app.flags.DEFINE_integer('num_gpus', 2,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -44,7 +44,7 @@ def tower_loss(scope):
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    _, lab_1dim = cnn_model.loss(logits, labels)
+    _, lab_1dim, accuracy = cnn_model.loss(logits, labels)
 
     # Assemble all of the losses for the current tower only.
     losses = tf.get_collection('losses', scope)
@@ -60,7 +60,7 @@ def tower_loss(scope):
         loss_name = re.sub('%s_[0-9]*/' % cnn_model.TOWER_NAME, '', l.op.name)
         tf.summary.scalar(loss_name, l)
 
-    return total_loss, txts, labels, logits, lab_1dim
+    return total_loss, txts, labels, logits, lab_1dim, accuracy
 
 
 def average_gradients(tower_grads):
@@ -88,16 +88,17 @@ def average_gradients(tower_grads):
             # Append on a 'tower' dimension which we will average over below.
             grads.append(expanded_g)
 
-    # Average over the 'tower' dimension.
-    grad = tf.concat(axis=0, values=grads)
-    grad = tf.reduce_mean(grad, 0)
+        # Average over the 'tower' dimension.
+        grad = tf.concat(axis=0, values=grads)
+        grad = tf.reduce_mean(grad, 0)
 
-    # Keep in mind that the Variables are redundant because they are shared
-    # across towers. So .. we will just return the first tower's pointer to
-    # the Variable.
-    v = grad_and_vars[0][1]
-    grad_and_var = (grad, v)
-    average_grads.append(grad_and_var)
+        # Keep in mind that the Variables are redundant because they are shared
+        # across towers. So .. we will just return the first tower's pointer to
+        # the Variable.
+        v = grad_and_vars[0][1]
+        grad_and_var = (grad, v)
+        average_grads.append(grad_and_var)
+
     return average_grads
 
 
@@ -135,7 +136,7 @@ def train():
                         # Calculate the loss for one tower of the CIFAR model. This function
                         # constructs the entire CIFAR model but shares the variables across
                         # all towers.
-                        loss, xs, ys, pred, lab_1dim = tower_loss(scope)
+                        loss, xs, ys, pred, lab_1dim, accuracy = tower_loss(scope)
 
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
@@ -203,7 +204,8 @@ def train():
         for step in xrange(FLAGS.max_steps):
             start_time = time.time()
             # _, loss_value = sess.run([train_op, loss])
-            _, loss_value, xs_val, ys_val, pred_val, lab_1dim_val = sess.run([train_op, loss, xs, ys, pred, lab_1dim])
+            _, loss_value, xs_val, ys_val, pred_val, lab_1dim_val, accuracy_val = \
+                sess.run([train_op, loss, xs, ys, pred, lab_1dim, accuracy])
 
             duration = time.time() - start_time
 
@@ -214,9 +216,9 @@ def train():
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = duration / FLAGS.num_gpus
 
-                format_str = ('%s: step %d, loss = %.2f (%.1f examples/sec; %.3f '
+                format_str = ('%s: step %d, loss = %.2f, acc = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch)')
-                print (format_str % (datetime.now(), step, loss_value,
+                print (format_str % (datetime.now(), step, loss_value, accuracy_val,
                                      examples_per_sec, sec_per_batch))
 
             if step % 100 == 0:
