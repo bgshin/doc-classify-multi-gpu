@@ -56,7 +56,7 @@ tf.app.flags.DEFINE_string('train_dir', '/home/bgshin/works/doc-classify-multi-g
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 1000000,
                             """Number of batches to run.""")
-tf.app.flags.DEFINE_integer('num_gpus', 4,
+tf.app.flags.DEFINE_integer('num_gpus', 2,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -222,7 +222,9 @@ def train():
     # Start running operations on the Graph. allow_soft_placement must be set to
     # True to build towers on GPU, as some of the ops do not have GPU
     # implementations.
+    gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(
+        gpu_options = gpu_options,
         allow_soft_placement=True,
         log_device_placement=FLAGS.log_device_placement))
     sess.run(init)

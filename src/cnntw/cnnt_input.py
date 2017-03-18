@@ -4,15 +4,9 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-import cnnt_input
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-
-# Process images of this size. Note that this differs from the original CIFAR
-# image size of 32 x 32. If one alters this number, then the entire model
-# architecture will change and any model would need to be retrained.
-IMAGE_SIZE = 24
 
 # Global constants describing the CIFAR-10 data set.
 NUM_CLASSES = 3
@@ -28,7 +22,7 @@ INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('data_dir', '../../data/tw.%s.tfrecords',
                            """Path to the CIFAR-10 data directory.""")
-tf.app.flags.DEFINE_integer('batch_size', 10,
+tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
 
 
@@ -63,7 +57,7 @@ def _get_inputs(data_dir, batch_size):
     batch_size: Number of images per batch.
 
     Returns:
-    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+    images: Images. 4D tensor of [batch_size, 60, 400, 1] size.
     labels: Labels. 1D tensor of [batch_size] size.
     """
     # filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i)
@@ -77,7 +71,7 @@ def _get_inputs(data_dir, batch_size):
     filename_queue = tf.train.string_input_producer(filenames)
 
     # Read examples from files in the filename queue.
-    read_input = cnnt_input.read_cnnt(filename_queue)
+    read_input = read_cnnt(filename_queue)
 
     feature = tf.expand_dims(read_input.features, 2)
     read_input.label.set_shape([3])
@@ -106,7 +100,7 @@ def get_inputs():
     """Construct input for CNNTW training using the Reader ops.
 
     Returns:
-    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 1] size.(4, 60, 400, 1)
+    images: Images. 4D tensor of [batch_size, 60, 400, 1] size.(4, 60, 400, 1)
     labels: Labels. 1D tensor of [batch_size, 3] size.(4, 3)
 
     Raises:

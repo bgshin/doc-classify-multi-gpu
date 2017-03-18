@@ -44,7 +44,7 @@ def tower_loss(scope):
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    _ = cnn_model.loss(logits, labels)
+    _, lab_1dim = cnn_model.loss(logits, labels)
 
     # Assemble all of the losses for the current tower only.
     losses = tf.get_collection('losses', scope)
@@ -60,7 +60,7 @@ def tower_loss(scope):
         loss_name = re.sub('%s_[0-9]*/' % cnn_model.TOWER_NAME, '', l.op.name)
         tf.summary.scalar(loss_name, l)
 
-    return total_loss
+    return total_loss, txts, labels, logits, lab_1dim
 
 
 def average_gradients(tower_grads):
@@ -135,7 +135,7 @@ def train():
                         # Calculate the loss for one tower of the CIFAR model. This function
                         # constructs the entire CIFAR model but shares the variables across
                         # all towers.
-                        loss = tower_loss(scope)
+                        loss, xs, ys, pred, lab_1dim = tower_loss(scope)
 
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
@@ -188,7 +188,9 @@ def train():
         # Start running operations on the Graph. allow_soft_placement must be set to
         # True to build towers on GPU, as some of the ops do not have GPU
         # implementations.
+        gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True)
         sess = tf.Session(config=tf.ConfigProto(
+            gpu_options=gpu_options,
             allow_soft_placement=True,
             log_device_placement=FLAGS.log_device_placement))
         sess.run(init)
@@ -200,7 +202,9 @@ def train():
 
         for step in xrange(FLAGS.max_steps):
             start_time = time.time()
-            _, loss_value = sess.run([train_op, loss])
+            # _, loss_value = sess.run([train_op, loss])
+            _, loss_value, xs_val, ys_val, pred_val, lab_1dim_val = sess.run([train_op, loss, xs, ys, pred, lab_1dim])
+
             duration = time.time() - start_time
 
             assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
