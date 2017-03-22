@@ -3,9 +3,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
-from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 # Global constants describing the CIFAR-10 data set.
@@ -14,24 +11,22 @@ NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 50000
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 10000
 
 MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
-NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
-LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
+# NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
+# LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
-
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('data_dir', '../../data/tw.%s.tfrecords',
                            """Path to the CIFAR-10 data directory.""")
-tf.app.flags.DEFINE_integer('batch_size', 100,
+tf.app.flags.DEFINE_integer('batch_size', 1000,
                             """Number of images to process in a batch.""")
-
 
 def read_cnnt(filename_queue):
     class CNNTRecord(object):
         pass
     result = CNNTRecord()
 
-    label_bytes = 3*8
+    label_bytes = NUM_CLASSES*8
     result.maxlen = 60
     result.w2vdim = 400
     input_bytes = (result.maxlen * result.w2vdim)*8
@@ -50,10 +45,10 @@ def read_cnnt(filename_queue):
 
 
 def _get_inputs(data_dir, batch_size):
-    """Construct distorted input for CIFAR training using the Reader ops.
+    """Construct distorted input for tweet training using the Reader ops.
 
     Args:
-    data_dir: Path to the CIFAR-10 data directory.
+    data_dir: Path to the tweet  data directory.
     batch_size: Number of images per batch.
 
     Returns:
@@ -96,8 +91,8 @@ def _get_inputs(data_dir, batch_size):
 
     return txts, labels
 
-def get_inputs():
-    """Construct input for CNNTW training using the Reader ops.
+def get_inputs(target, batch_size=4):
+    """Construct input for tweet training using the Reader ops.
 
     Returns:
     images: Images. 4D tensor of [batch_size, 60, 400, 1] size.(4, 60, 400, 1)
@@ -108,7 +103,7 @@ def get_inputs():
     """
     if not FLAGS.data_dir:
         raise ValueError('Please supply a data_dir')
-    data_dir = FLAGS.data_dir % 'trn'
-    txts, labels = _get_inputs(data_dir=data_dir, batch_size=FLAGS.batch_size)
+    data_dir = FLAGS.data_dir % target
+    txts, labels = _get_inputs(data_dir=data_dir, batch_size=batch_size)
 
     return txts, labels

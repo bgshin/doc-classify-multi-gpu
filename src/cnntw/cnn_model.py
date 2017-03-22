@@ -89,24 +89,10 @@ def inference(txts):
     # If we only ran this model on a single GPU, we could simplify this function
     # by replacing all instances of tf.get_variable() with tf.Variable().
     #
-    # conv1 [filter_size, embedding_size, 1, num_filters]
     sequence_length = 60
     embedding_size = 400
     num_filters = 64
     filter_sizes = [2, 3, 4, 5]
-
-
-    # with tf.variable_scope('conv1') as scope:
-    #     kernel = _variable_with_weight_decay('weights',
-    #                                             shape=cnn_shape,
-    #                                             stddev=5e-2,
-    #                                             wd=0.0)
-    #     conv = tf.nn.conv2d(txts, kernel, [1, 1, 1, 1], padding='VALID')
-    #     biases = _variable_on_cpu('biases', [64], tf.constant_initializer(0.1))
-    #     pre_activation = tf.nn.bias_add(conv, biases)
-    #     conv1 = tf.nn.relu(pre_activation, name=scope.name)
-    #     _activation_summary(conv1)
-
 
     pooled_outputs = []
     for i, filter_size in enumerate(filter_sizes):
@@ -130,13 +116,12 @@ def inference(txts):
             pooled = tf.nn.max_pool(conv_out, ksize=ksize, strides=[1, 1, 1, 1],
                                  padding='VALID', name='pool1')
 
-            pooled_outputs.append(pooled)
+            norm_pooled = tf.nn.lrn(pooled, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
+                            name='norm1')
 
-    # norm1
-    # norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
-    #                 name='norm1')
+            # pooled_outputs.append(pooled)
+            pooled_outputs.append(norm_pooled)
 
-    # norm1 = pool1
 
 
 
@@ -194,4 +179,4 @@ def loss(logits, labels):
 
     # The total loss is defined as the cross entropy loss plus all of the weight
     # decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name='total_loss'), labels, accuracy
+    return tf.add_n(tf.get_collection('losses'), name='total_loss'), accuracy

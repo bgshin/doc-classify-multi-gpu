@@ -27,27 +27,27 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
 
 
-def tower_loss(scope):
+def tower_loss(namescope, target, batch_size=4):
     """Calculate the total loss on a single tower running the CIFAR model.
 
     Args:
-    scope: unique prefix string identifying the tweets tower, e.g. 'tower_0'
+    namescope: unique prefix string identifying the tweets tower, e.g. 'tower_0'
 
     Returns:
      Tensor of shape [] containing the total loss for a batch of data
     """
     # Get images and labels for tweets
-    txts, labels = cnnt_input.get_inputs()
+    txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
 
     # Build inference Graph.
     logits = cnn_model.inference(txts)
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    _, lab_1dim, accuracy = cnn_model.loss(logits, labels)
+    _, accuracy = cnn_model.loss(logits, labels)
 
     # Assemble all of the losses for the current tower only.
-    losses = tf.get_collection('losses', scope)
+    losses = tf.get_collection('losses', namescope)
 
     # Calculate the total loss for the current tower.
     total_loss = tf.add_n(losses, name='total_loss')
@@ -60,7 +60,7 @@ def tower_loss(scope):
         loss_name = re.sub('%s_[0-9]*/' % cnn_model.TOWER_NAME, '', l.op.name)
         tf.summary.scalar(loss_name, l)
 
-    return total_loss, txts, labels, logits, lab_1dim, accuracy
+    return total_loss, accuracy
 
 
 def average_gradients(tower_grads):
@@ -112,37 +112,46 @@ def train():
             initializer=tf.constant_initializer(0), trainable=False)
 
         # Calculate the learning rate schedule.
-        num_batches_per_epoch = (cnnt_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN /
-                                 FLAGS.batch_size)
-        decay_steps = int(num_batches_per_epoch * cnnt_input.NUM_EPOCHS_PER_DECAY)
+        # num_batches_per_epoch = (cnnt_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN /
+        #                          FLAGS.batch_size)
+        # decay_steps = int(num_batches_per_epoch * cnnt_input.NUM_EPOCHS_PER_DECAY)
 
         # Decay the learning rate exponentially based on the number of steps.
-        lr = tf.train.exponential_decay(cnnt_input.INITIAL_LEARNING_RATE,
-                                        global_step,
-                                        decay_steps,
-                                        cnnt_input.LEARNING_RATE_DECAY_FACTOR,
-                                        staircase=True)
+        # lr = tf.train.exponential_decay(cnnt_input.INITIAL_LEARNING_RATE,
+        #                                 global_step,
+        #                                 decay_steps,
+        #                                 cnnt_input.LEARNING_RATE_DECAY_FACTOR,
+        #                                 staircase=True)
 
         # Create an optimizer that performs gradient descent.
-        opt = tf.train.GradientDescentOptimizer(lr)
+        # opt = tf.train.GradientDescentOptimizer(lr)
+        opt = tf.train.AdamOptimizer(1e-3)
 
         # Calculate the gradients for each model tower.
         tower_grads = []
 
+
+
         with tf.variable_scope(tf.get_variable_scope()):
+            with tf.device('/gpu:%d' % 0):
+                with tf.name_scope('%s_%d_dev' % (cnn_model.TOWER_NAME, 0)) as namescope:
+                    loss_dev, accuracy_dev = tower_loss(namescope, 'dev', batch_size=1588)
+                    # Reuse variables for the next tower.
+                    tf.get_variable_scope().reuse_variables()
+
             for i in xrange(FLAGS.num_gpus):
                 with tf.device('/gpu:%d' % i):
-                    with tf.name_scope('%s_%d' % (cnn_model.TOWER_NAME, i)) as scope:
+                    with tf.name_scope('%s_%d' % (cnn_model.TOWER_NAME, i)) as namescope:
                         # Calculate the loss for one tower of the CIFAR model. This function
                         # constructs the entire CIFAR model but shares the variables across
                         # all towers.
-                        loss, xs, ys, pred, lab_1dim, accuracy = tower_loss(scope)
+                        loss, accuracy = tower_loss(namescope, 'trn', batch_size=FLAGS.batch_size)
 
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
 
                         # Retain the summaries from the final tower.
-                        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, namescope)
 
                         # Calculate the gradients for the batch of data on this CIFAR tower.
                         grads = opt.compute_gradients(loss)
@@ -154,8 +163,8 @@ def train():
         # synchronization point across all towers.
         grads = average_gradients(tower_grads)
 
-        # Add a summary to track the learning rate.
-        summaries.append(tf.summary.scalar('learning_rate', lr))
+        # # Add a summary to track the learning rate.
+        # summaries.append(tf.summary.scalar('learning_rate', lr))
 
         # Add histograms for gradients.
         for grad, var in grads:
@@ -204,8 +213,7 @@ def train():
         for step in xrange(FLAGS.max_steps):
             start_time = time.time()
             # _, loss_value = sess.run([train_op, loss])
-            _, loss_value, xs_val, ys_val, pred_val, lab_1dim_val, accuracy_val = \
-                sess.run([train_op, loss, xs, ys, pred, lab_1dim, accuracy])
+            _, loss_value, accuracy_val = sess.run([train_op, loss, accuracy])
 
             duration = time.time() - start_time
 
@@ -224,6 +232,10 @@ def train():
             if step % 100 == 0:
                 summary_str = sess.run(summary_op)
                 summary_writer.add_summary(summary_str, step)
+
+                loss_dev_value, accuracy_dev_value = sess.run([loss_dev, accuracy_dev])
+                format_str = ('[Eval] %s: step %d, loss = %.2f, acc = %.2f')
+                print(format_str % (datetime.now(), step, loss_dev_value, accuracy_dev_value))
 
             # Save the model checkpoint periodically.
             if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
