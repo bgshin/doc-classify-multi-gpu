@@ -199,7 +199,7 @@ def train():
         # True to build towers on GPU, as some of the ops do not have GPU
         # implementations.
         # gpu_options = tf.GPUOptions(visible_device_list=str('0,1,2,3'), allow_growth=True)
-        gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True)
+        gpu_options = tf.GPUOptions(visible_device_list=str('1,2,3'), allow_growth=True)
         sess = tf.Session(config=tf.ConfigProto(
             gpu_options=gpu_options,
             allow_soft_placement=True,
