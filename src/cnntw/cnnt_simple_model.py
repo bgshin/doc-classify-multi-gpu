@@ -37,7 +37,11 @@ def tower_loss(namescope, target, batch_size=4):
      Tensor of shape [] containing the total loss for a batch of data
     """
     # Get images and labels for tweets
-    txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
+    if target=='trn':
+        txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
+
+    else: # 'dev'
+        txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
 
     # Build inference Graph.
     logits = cnn_model.inference(txts)
@@ -60,7 +64,7 @@ def tower_loss(namescope, target, batch_size=4):
         loss_name = re.sub('%s_[0-9]*/' % cnn_model.TOWER_NAME, '', l.op.name)
         tf.summary.scalar(loss_name, l)
 
-    return total_loss, accuracy
+    return total_loss, accuracy, logits
 
 
 def average_gradients(tower_grads):
@@ -135,7 +139,7 @@ def train():
         with tf.variable_scope(tf.get_variable_scope()):
             with tf.device('/gpu:%d' % 0):
                 with tf.name_scope('%s_%d_dev' % (cnn_model.TOWER_NAME, 0)) as namescope:
-                    loss_dev, accuracy_dev = tower_loss(namescope, 'dev', batch_size=1588)
+                    loss_dev, accuracy_dev, logits_dev = tower_loss(namescope, 'dev', batch_size=1588)
                     # Reuse variables for the next tower.
                     tf.get_variable_scope().reuse_variables()
 
@@ -145,7 +149,7 @@ def train():
                         # Calculate the loss for one tower of the CIFAR model. This function
                         # constructs the entire CIFAR model but shares the variables across
                         # all towers.
-                        loss, accuracy = tower_loss(namescope, 'trn', batch_size=FLAGS.batch_size)
+                        loss, accuracy, _ = tower_loss(namescope, 'trn', batch_size=FLAGS.batch_size)
 
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
@@ -236,7 +240,7 @@ def train():
                 summary_str = sess.run(summary_op)
                 summary_writer.add_summary(summary_str, step)
 
-                loss_dev_value, accuracy_dev_value = sess.run([loss_dev, accuracy_dev])
+                loss_dev_value, accuracy_dev_value, logits_dev_value = sess.run([loss_dev, accuracy_dev, logits_dev])
                 format_str = ('[Eval] %s: step %d, loss = %.2f, acc = %.2f')
                 print(format_str % (datetime.now(), step, loss_dev_value, accuracy_dev_value))
 
