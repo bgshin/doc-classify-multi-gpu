@@ -37,13 +37,13 @@ def tower_loss(namescope, target, batch_size=4):
      Tensor of shape [] containing the total loss for a batch of data
     """
     # Get images and labels for tweets
-    txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
+    # txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
 
-    # if target == 'trn':
-    #     txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
-    #
-    # else:  # 'dev'
-    #     txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
+    if target == 'trn':
+        txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
+
+    else:  # 'dev'
+        txts, labels = cnnt_input.get_inputs('tst', batch_size=batch_size)
 
     # Build inference Graph.
     logits = cnn_model.inference(txts)
@@ -207,8 +207,8 @@ def train():
         # gpu_options = tf.GPUOptions(visible_device_list=str('0,1,2,3'), allow_growth=True)
         # gpu_options = tf.GPUOptions(visible_device_list=str('1,2,3'), allow_growth=True) # dead
         # gpu_options = tf.GPUOptions(visible_device_list=str('0,2,3'), allow_growth=True)  # dead
-        # gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True) # ok
-        gpu_options = tf.GPUOptions(visible_device_list=str('1,2'), allow_growth=True)  # ?
+        gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True) # ok
+        # gpu_options = tf.GPUOptions(visible_device_list=str('1,2'), allow_growth=True)  # dead
         sess = tf.Session(config=tf.ConfigProto(
             gpu_options=gpu_options,
             allow_soft_placement=True,
