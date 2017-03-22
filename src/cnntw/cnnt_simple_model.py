@@ -16,7 +16,7 @@ import cnn_model
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('train_dir', '/home/bgshin/works/doc-classify-multi-gpu/src/cnntw/cnntw_train',
+tf.app.flags.DEFINE_string('train_dir', './train/',
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_steps', 1000000,
