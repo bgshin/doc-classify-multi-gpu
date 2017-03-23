@@ -47,7 +47,7 @@ def tower_loss(namescope, target, batch_size=4):
     #     txts, labels = cnnt_input.get_inputs('tst', batch_size=batch_size)
 
     # Build inference Graph.
-    if target=='trn'
+    if target=='trn':
         logits = cnn_model.inference(txts, dropout_keep_prob=FLAGS.dropout_keep_prob)
 
     else:
