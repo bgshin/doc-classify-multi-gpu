@@ -18,7 +18,7 @@ INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('data_dir', '../../data/tw.%s.tfrecords',
                            """Path to the CIFAR-10 data directory.""")
-tf.app.flags.DEFINE_integer('batch_size', 100,
+tf.app.flags.DEFINE_integer('batch_size', 64,
                             """Number of images to process in a batch.""")
 
 def read_cnnt(filename_queue):
