@@ -75,7 +75,7 @@ def _activation_summary(x):
 
 
 
-def inference(txts):
+def inference(txts, dropout_keep_prob=1.0):
     """Build the cnn based sentiment prediction model.
 
     Args:
@@ -133,6 +133,8 @@ def inference(txts):
     h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
     print 'h_pool', h_pool
     print 'h_pool_flat', h_pool_flat
+
+    h_drop = tf.nn.dropout(h_pool_flat, dropout_keep_prob)
 
 
     # num_filters_total = num_filters * 1

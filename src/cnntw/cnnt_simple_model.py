@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_integer('num_gpus', 4,
                             """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
-
+tf.app.flags.DEFINE_float('dropout_keep_prob', 0.8, """dropout_keep_prob""")
 
 def tower_loss(namescope, target, batch_size=4):
     """Calculate the total loss on a single tower running the CIFAR model.
@@ -47,7 +47,12 @@ def tower_loss(namescope, target, batch_size=4):
     #     txts, labels = cnnt_input.get_inputs('tst', batch_size=batch_size)
 
     # Build inference Graph.
-    logits = cnn_model.inference(txts)
+    if target=='trn'
+        logits = cnn_model.inference(txts, dropout_keep_prob=FLAGS.dropout_keep_prob)
+
+    else:
+        logits = cnn_model.inference(txts)
+
 
     y_true = tf.argmax(labels, 1, name="golds")
     y_pred = tf.argmax(logits, 1, name="predictions")
