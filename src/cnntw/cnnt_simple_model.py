@@ -37,13 +37,13 @@ def tower_loss(namescope, target, batch_size=4):
      Tensor of shape [] containing the total loss for a batch of data
     """
     # Get images and labels for tweets
-    # txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
+    txts, labels = cnnt_input.get_inputs(target, batch_size=batch_size)
 
-    if target == 'trn':
-        txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
-
-    else:  # 'dev'
-        txts, labels = cnnt_input.get_inputs('tst', batch_size=batch_size)
+    # if target == 'trn':
+    #     txts, labels = cnnt_input.get_inputs('trn', batch_size=batch_size)
+    #
+    # else:  # 'dev'
+    #     txts, labels = cnnt_input.get_inputs('tst', batch_size=batch_size)
 
     # Build inference Graph.
     logits = cnn_model.inference(txts)
@@ -144,6 +144,13 @@ def train():
                     loss_dev, accuracy_dev, logits_dev = tower_loss(namescope, 'dev', batch_size=1588)
                     # Reuse variables for the next tower.
                     tf.get_variable_scope().reuse_variables()
+
+            with tf.device('/gpu:%d' % 1):
+                with tf.name_scope('%s_%d_tst' % (cnn_model.TOWER_NAME, 0)) as namescope:
+                    loss_tst, accuracy_tst, logits_tst = tower_loss(namescope, 'tst', batch_size=20632)
+                    # Reuse variables for the next tower.
+                    tf.get_variable_scope().reuse_variables()
+
 
             for i in xrange(FLAGS.num_gpus):
                 with tf.device('/gpu:%d' % i):
@@ -246,6 +253,12 @@ def train():
                 loss_dev_value, accuracy_dev_value, logits_dev_value = sess.run([loss_dev, accuracy_dev, logits_dev])
                 format_str = ('[Eval] %s: step %d, loss = %.2f, acc = %.2f')
                 print(format_str % (datetime.now(), step, loss_dev_value, accuracy_dev_value))
+
+                loss_tst_value, accuracy_tst_value, logits_tst_value = sess.run([loss_tst, accuracy_tst, logits_tst])
+                format_str = ('[Test] %s: step %d, loss = %.2f, acc = %.2f')
+                print(format_str % (datetime.now(), step, loss_tst_value, accuracy_tst_value))
+
+
 
             # Save the model checkpoint periodically.
             if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
