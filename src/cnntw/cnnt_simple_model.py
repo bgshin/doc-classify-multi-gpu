@@ -13,6 +13,7 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import cnnt_input
 import cnn_model
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -48,6 +49,9 @@ def tower_loss(namescope, target, batch_size=4):
     # Build inference Graph.
     logits = cnn_model.inference(txts)
 
+    y_true = tf.argmax(labels, 1, name="golds")
+    y_pred = tf.argmax(logits, 1, name="predictions")
+
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
     _, accuracy = cnn_model.loss(logits, labels)
@@ -66,7 +70,7 @@ def tower_loss(namescope, target, batch_size=4):
         loss_name = re.sub('%s_[0-9]*/' % cnn_model.TOWER_NAME, '', l.op.name)
         tf.summary.scalar(loss_name, l)
 
-    return total_loss, accuracy, logits
+    return total_loss, accuracy, logits, y_true, y_pred
 
 
 def average_gradients(tower_grads):
@@ -141,13 +145,15 @@ def train():
         with tf.variable_scope(tf.get_variable_scope()):
             with tf.device('/gpu:%d' % 0):
                 with tf.name_scope('%s_%d_dev' % (cnn_model.TOWER_NAME, 0)) as namescope:
-                    loss_dev, accuracy_dev, logits_dev = tower_loss(namescope, 'dev', batch_size=1588)
+                    loss_dev, accuracy_dev, logits_dev, y_true_dev, y_pred_dev = \
+                        tower_loss(namescope, 'dev', batch_size=1588)
                     # Reuse variables for the next tower.
                     tf.get_variable_scope().reuse_variables()
 
             with tf.device('/gpu:%d' % 1):
                 with tf.name_scope('%s_%d_tst' % (cnn_model.TOWER_NAME, 0)) as namescope:
-                    loss_tst, accuracy_tst, logits_tst = tower_loss(namescope, 'tst', batch_size=20632)
+                    loss_tst, accuracy_tst, logits_tst, y_true_tst, y_pred_tst = \
+                        tower_loss(namescope, 'tst', batch_size=20632)
                     # Reuse variables for the next tower.
                     tf.get_variable_scope().reuse_variables()
 
@@ -158,7 +164,7 @@ def train():
                         # Calculate the loss for one tower of the CIFAR model. This function
                         # constructs the entire CIFAR model but shares the variables across
                         # all towers.
-                        loss, accuracy, _ = tower_loss(namescope, 'trn', batch_size=FLAGS.batch_size)
+                        loss, accuracy, _, _, _ = tower_loss(namescope, 'trn', batch_size=FLAGS.batch_size)
 
                         # Reuse variables for the next tower.
                         tf.get_variable_scope().reuse_variables()
@@ -241,7 +247,7 @@ def train():
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = duration / FLAGS.num_gpus
 
-                format_str = ('%s: step %d, loss = %.2f, acc = %.2f (%.1f examples/sec; %.3f '
+                format_str = ('%s: step %d, loss = %.4f, acc = %.4f (%.1f examples/sec; %.3f '
                               'sec/batch)')
                 print (format_str % (datetime.now(), step, loss_value, accuracy_val,
                                      examples_per_sec, sec_per_batch))
@@ -250,15 +256,30 @@ def train():
                 summary_str = sess.run(summary_op)
                 summary_writer.add_summary(summary_str, step)
 
-                loss_dev_value, accuracy_dev_value, logits_dev_value = sess.run([loss_dev, accuracy_dev, logits_dev])
-                format_str = ('[Eval] %s: step %d, loss = %.2f, acc = %.2f')
-                print(format_str % (datetime.now(), step, loss_dev_value, accuracy_dev_value))
+                loss_dev_value, accuracy_dev_value, logits_dev_value, y_true_dev_value, y_pred_dev_value = \
+                    sess.run([loss_dev, accuracy_dev, logits_dev, y_true_dev, y_pred_dev])
 
-                loss_tst_value, accuracy_tst_value, logits_tst_value = sess.run([loss_tst, accuracy_tst, logits_tst])
-                format_str = ('[Test] %s: step %d, loss = %.2f, acc = %.2f')
-                print(format_str % (datetime.now(), step, loss_tst_value, accuracy_tst_value))
+                # p_neg_dev = precision_score(y_true_dev_value==0, y_pred_dev_value==0)
+                # r_neg_dev = recall_score(y_true_dev_value==0, y_pred_dev_value==0)
+                f1_neg_dev = f1_score(y_true_dev_value==0, y_pred_dev_value==0)
+                # p_pos_dev = precision_score(y_true_dev_value == 2, y_pred_dev_value == 2)
+                # r_pos_dev = recall_score(y_true_dev_value == 2, y_pred_dev_value == 2)
+                f1_pos_dev = f1_score(y_true_dev_value == 2, y_pred_dev_value == 2)
+                f1_avg_dev = (f1_neg_dev+f1_pos_dev)/2
 
 
+                format_str = ('[Eval] %s: step %d, loss = %.4f, acc = %.4f, f1neg = %.4f, f1pos = %.4f, f1 = %.4f')
+                print(format_str % (datetime.now(), step, loss_dev_value, accuracy_dev_value,
+                                    f1_neg_dev, f1_pos_dev, f1_avg_dev))
+
+                loss_tst_value, accuracy_tst_value, logits_tst_value, y_true_tst_value, y_pred_tst_value = \
+                    sess.run([loss_tst, accuracy_tst, logits_tst, y_true_tst, y_pred_tst])
+                f1_neg_tst = f1_score(y_true_tst_value == 0, y_pred_tst_value == 0)
+                f1_pos_tst = f1_score(y_true_tst_value == 2, y_pred_tst_value == 2)
+                f1_avg_tst = (f1_neg_tst + f1_pos_tst) / 2
+                format_str = ('[Test] %s: step %d, loss = %.4f, acc = %.4f, f1neg = %.4f, f1pos = %.4f, f1 = %.4f')
+                print(format_str % (datetime.now(), step, loss_tst_value, accuracy_tst_value,
+                                    f1_neg_tst, f1_pos_tst, f1_avg_tst))
 
             # Save the model checkpoint periodically.
             if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
