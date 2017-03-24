@@ -222,11 +222,11 @@ def train():
         # Start running operations on the Graph. allow_soft_placement must be set to
         # True to build towers on GPU, as some of the ops do not have GPU
         # implementations.
-        # gpu_options = tf.GPUOptions(visible_device_list=str('0,1,2,3'), allow_growth=True)
-        # gpu_options = tf.GPUOptions(visible_device_list=str('1,2,3'), allow_growth=True) # dead
-        # gpu_options = tf.GPUOptions(visible_device_list=str('0,2,3'), allow_growth=True)  # dead
-        gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True) # ok
-        # gpu_options = tf.GPUOptions(visible_device_list=str('1,2'), allow_growth=True)  # dead
+        # gpu_options = tf.GPUOptions(visible_device_list=str('0,1,2,3'), allow_growth=True) # d
+        # gpu_options = tf.GPUOptions(visible_device_list=str('1,2,3'), allow_growth=True) # d
+        # gpu_options = tf.GPUOptions(visible_device_list=str('0,2,3'), allow_growth=True)  # d
+        gpu_options = tf.GPUOptions(visible_device_list=str('2,3'), allow_growth=True) # o
+        # gpu_options = tf.GPUOptions(visible_device_list=str('1,2'), allow_growth=True)  # d
         sess = tf.Session(config=tf.ConfigProto(
             gpu_options=gpu_options,
             allow_soft_placement=True,
@@ -293,7 +293,6 @@ def train():
 
 
 def main(argv=None):  # pylint: disable=unused-argument
-    # cifar10.maybe_download_and_extract()
     if tf.gfile.Exists(FLAGS.train_dir):
         tf.gfile.DeleteRecursively(FLAGS.train_dir)
     tf.gfile.MakeDirs(FLAGS.train_dir)
