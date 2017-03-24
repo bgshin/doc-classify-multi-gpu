@@ -54,6 +54,34 @@ def _variable_with_weight_decay(name, shape, stddev, wd):
 
     return var
 
+def _variable_with_weight_decay_xavier(name, shape, wd):
+    """Helper to create an initialized Variable with weight decay.
+
+    Note that the Variable is initialized with a truncated normal distribution.
+    A weight decay is added only if one is specified.
+
+    Args:
+        name: name of the variable
+        shape: list of ints
+        stddev: standard deviation of a truncated Gaussian
+        wd: add L2Loss weight decay multiplied by this float. If None, weight
+            decay is not added for this Variable.
+
+    Returns:
+        Variable Tensor
+    """
+    dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
+    var = _variable_on_cpu(
+        name,
+        shape,
+        tf.contrib.layers.xavier_initializer())
+    if wd is not None:
+        weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
+        tf.add_to_collection('losses', weight_decay)
+
+    return var
+
+
 
 def _activation_summary(x):
     """Helper to create summaries for activations.
@@ -100,8 +128,8 @@ def inference(txts, dropout_keep_prob=1.0):
             cnn_shape = [filter_size, embedding_size, 1, num_filters]
             kernel = _variable_with_weight_decay('weights',
                                                  shape=cnn_shape,
-                                                 stddev=5e-2,
-                                                 wd=0.0)
+                                                 stddev=0.1,
+                                                 wd=None)
             conv = tf.nn.conv2d(txts, kernel, [1, 1, 1, 1], padding='VALID')
             biases = _variable_on_cpu('biases', [num_filters], tf.constant_initializer(0.0))
             pre_activation = tf.nn.bias_add(conv, biases)
@@ -142,8 +170,8 @@ def inference(txts, dropout_keep_prob=1.0):
 
 
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay('weights', [num_filters_total, NUM_CLASSES],
-                                              stddev=1/float(num_filters_total), wd=0.0)
+        weights = _variable_with_weight_decay_xavier('weights', [num_filters_total, NUM_CLASSES],
+                                            wd=0.2)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.1))
         softmax_linear = tf.add(tf.matmul(h_pool_flat, weights), biases, name=scope.name)
