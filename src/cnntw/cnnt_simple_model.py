@@ -247,7 +247,7 @@ def train():
 
             assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
-            if step > 1 and step % 10 == 0:
+            if step % 10 == 0:
                 num_examples_per_step = FLAGS.batch_size * FLAGS.num_gpus
                 examples_per_sec = num_examples_per_step / duration
                 sec_per_batch = duration / FLAGS.num_gpus
@@ -257,7 +257,7 @@ def train():
                 print (format_str % (datetime.now(), step, loss_value, accuracy_val,
                                      examples_per_sec, sec_per_batch))
 
-            if step > 1 and step % 100 == 0:
+            if step % 100 == 0:
                 summary_str = sess.run(summary_op)
                 summary_writer.add_summary(summary_str, step)
 
@@ -287,7 +287,7 @@ def train():
                                     f1_neg_tst, f1_pos_tst, f1_avg_tst))
 
             # Save the model checkpoint periodically.
-            if step > 1 and step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
+            if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
                 checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
                 saver.save(sess, checkpoint_path, global_step=step)
 
