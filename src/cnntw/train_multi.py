@@ -118,6 +118,10 @@ def average_gradients(tower_grads):
 
 
 def train():
+    maxdev = 0
+    maxtst = 0
+    maxindex = 0
+
     """Train cnnt for a number of steps."""
     with tf.Graph().as_default(), tf.device('/cpu:0'):
         # Create a variable to count the number of train() calls. This equals the
@@ -264,11 +268,7 @@ def train():
                 loss_dev_value, accuracy_dev_value, logits_dev_value, y_true_dev_value, y_pred_dev_value = \
                     sess.run([loss_dev, accuracy_dev, logits_dev, y_true_dev, y_pred_dev])
 
-                # p_neg_dev = precision_score(y_true_dev_value==0, y_pred_dev_value==0)
-                # r_neg_dev = recall_score(y_true_dev_value==0, y_pred_dev_value==0)
                 f1_neg_dev = f1_score(y_true_dev_value==0, y_pred_dev_value==0)
-                # p_pos_dev = precision_score(y_true_dev_value == 2, y_pred_dev_value == 2)
-                # r_pos_dev = recall_score(y_true_dev_value == 2, y_pred_dev_value == 2)
                 f1_pos_dev = f1_score(y_true_dev_value == 2, y_pred_dev_value == 2)
                 f1_avg_dev = (f1_neg_dev+f1_pos_dev)/2
 
@@ -279,12 +279,23 @@ def train():
 
                 loss_tst_value, accuracy_tst_value, logits_tst_value, y_true_tst_value, y_pred_tst_value = \
                     sess.run([loss_tst, accuracy_tst, logits_tst, y_true_tst, y_pred_tst])
+
                 f1_neg_tst = f1_score(y_true_tst_value == 0, y_pred_tst_value == 0)
                 f1_pos_tst = f1_score(y_true_tst_value == 2, y_pred_tst_value == 2)
                 f1_avg_tst = (f1_neg_tst + f1_pos_tst) / 2
+
                 format_str = ('[Test] %s: step %d, loss = %.4f, acc = %.4f, f1neg = %.4f, f1pos = %.4f, f1 = %.4f')
                 print(format_str % (datetime.now(), step, loss_tst_value, accuracy_tst_value,
                                     f1_neg_tst, f1_pos_tst, f1_avg_tst))
+
+                if maxdev<f1_avg_dev:
+                    maxdev = f1_avg_dev
+                    maxtst = f1_avg_tst
+                    maxindex = step
+
+                format_str = ('[Status] %s: step %d, maxindex = %d, maxdev = %.4f, maxtst = %.4f')
+                print(format_str % (datetime.now(), step, maxindex, maxdev, maxtst))
+
 
             # Save the model checkpoint periodically.
             if step % 1000 == 0 or (step + 1) == FLAGS.max_steps:
